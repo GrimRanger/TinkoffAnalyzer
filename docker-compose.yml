@@ -1,0 +1,66 @@
+version: '3.7'
+
+
+volumes:
+    prometheus_data_n: {}
+    grafana_data: {}
+
+
+networks:
+  front-tier:
+  back-tier:
+
+
+services:
+
+  tinkoff_server:
+    build: ./app
+    volumes:
+      - ./app/:/usr/src/app/
+    ports:
+      - 40010:40010
+    networks:
+      - back-tier
+    env_file:
+      - ./.server.env
+   
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data_n:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    restart: always
+    ports:
+      - 9090:9090
+    networks:
+      - back-tier
+    labels:
+      org.label-schema.group: "monitoring"
+
+  grafana:
+    image: grafana/grafana
+    user: "472"
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    networks:
+      - back-tier
+      - front-tier
+    restart: always
+    labels:
+      org.label-schema.group: "monitoring"
